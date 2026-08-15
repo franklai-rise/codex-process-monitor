@@ -13,6 +13,9 @@ internal static partial class NativeMethods
     internal const uint ProcessQueryLimitedInformation = 0x1000;
     internal const int ErrorNoMoreFiles = 18;
 
+    [UnmanagedFunctionPointer(CallingConvention.Winapi)]
+    internal delegate bool EnumWindowsProc(nint windowHandle, nint lParam);
+
     [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
     internal struct ProcessEntry32
     {
@@ -91,6 +94,15 @@ internal static partial class NativeMethods
         public ulong AvailableExtendedVirtual;
     }
 
+    [StructLayout(LayoutKind.Sequential)]
+    internal struct WindowRect
+    {
+        public int Left;
+        public int Top;
+        public int Right;
+        public int Bottom;
+    }
+
     [DllImport("kernel32.dll", SetLastError = true)]
     internal static extern SafeFileHandle CreateToolhelp32Snapshot(uint flags, uint processId);
 
@@ -149,4 +161,29 @@ internal static partial class NativeMethods
         uint flags,
         [Out] char[] imagePath,
         ref uint size);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static extern bool EnumWindows(EnumWindowsProc callback, nint lParam);
+
+    [DllImport("user32.dll")]
+    internal static extern uint GetWindowThreadProcessId(nint windowHandle, out uint processId);
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static extern bool IsWindowVisible(nint windowHandle);
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static extern bool IsIconic(nint windowHandle);
+
+    [DllImport("user32.dll")]
+    internal static extern nint GetForegroundWindow();
+
+    [DllImport("user32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static extern bool GetWindowRect(nint windowHandle, out WindowRect rectangle);
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    internal static extern int GetClassNameW(nint windowHandle, [Out] char[] className, int maximumCount);
 }

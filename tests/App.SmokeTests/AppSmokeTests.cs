@@ -39,6 +39,9 @@ public sealed class AppSmokeTests
 
         Assert.Equal(snapshot.ProcessCount, snapshot.Processes.Count);
         Assert.All(snapshot.Processes, process => Assert.True(process.ProcessId > 0));
+        Assert.All(snapshot.Processes, process => Assert.False(string.IsNullOrWhiteSpace(process.WindowAssociation)));
+        Assert.All(snapshot.Windows ?? Array.Empty<WindowSample>(), window =>
+            Assert.Contains(snapshot.Processes, process => process.ProcessId == window.OwnerProcessId));
         Assert.DoesNotContain(snapshot.Processes, process =>
             process.Name.Equals("services.exe", StringComparison.OrdinalIgnoreCase) ||
             process.Name.Equals("lsass.exe", StringComparison.OrdinalIgnoreCase));
@@ -69,5 +72,23 @@ public sealed class AppSmokeTests
 
         Assert.Equal(first.InstanceKey, refreshed.InstanceKey);
         Assert.True(refreshed.IsExpanded);
+    }
+
+    [Fact]
+    public void ProcessNodeKeepsPrivacyPreservingWindowAssociation()
+    {
+        var node = new ProcessNode(new ProcessSample(
+            42,
+            7,
+            "ChatGPT.exe",
+            1,
+            1024,
+            "运行中",
+            InstanceKey: "42:638000000000000000",
+            WindowAssociation: "共享渲染器 · 窗口 1 前台（无法按对话确认）",
+            WindowAssociationKind: "shared-renderer"));
+
+        Assert.Contains("共享渲染器", node.WindowAssociation, StringComparison.Ordinal);
+        Assert.Equal("shared-renderer", node.WindowAssociationKind);
     }
 }

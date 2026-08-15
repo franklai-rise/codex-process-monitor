@@ -11,7 +11,8 @@ public sealed record MonitorSnapshot(
     long WorkingSetBytes,
     int ProcessCount,
     IReadOnlyList<ProcessSample> Processes,
-    IReadOnlyList<AlertSample> Alerts);
+    IReadOnlyList<AlertSample> Alerts,
+    IReadOnlyList<WindowSample>? Windows = null);
 
 public sealed record ProcessSample(
     int ProcessId,
@@ -21,7 +22,20 @@ public sealed record ProcessSample(
     long MemoryBytes,
     string Status,
     bool IsElevated = false,
-    string? InstanceKey = null);
+    string? InstanceKey = null,
+    string WindowAssociation = "无顶级窗口",
+    string WindowAssociationKind = "none");
+
+/// <summary>
+/// A numbered, privacy-preserving native desktop window. Labels intentionally
+/// do not contain a conversation title or any UI text from Codex.
+/// </summary>
+public sealed record WindowSample(
+    string InstanceKey,
+    int OwnerProcessId,
+    string Label,
+    string State,
+    string Description);
 
 public sealed record AlertSample(
     DateTimeOffset Timestamp,
@@ -53,6 +67,8 @@ public sealed class ProcessNode : INotifyPropertyChanged
         CpuPercent = sample.CpuPercent;
         MemoryBytes = sample.MemoryBytes;
         Status = sample.Status;
+        WindowAssociation = sample.WindowAssociation;
+        WindowAssociationKind = sample.WindowAssociationKind;
         Children = new ObservableCollection<ProcessNode>();
     }
 
@@ -65,6 +81,8 @@ public sealed class ProcessNode : INotifyPropertyChanged
     public double CpuPercent { get; }
     public long MemoryBytes { get; }
     public string Status { get; }
+    public string WindowAssociation { get; }
+    public string WindowAssociationKind { get; }
     public ObservableCollection<ProcessNode> Children { get; }
 
     /// <summary>
@@ -153,4 +171,23 @@ public sealed class HistoryItem
     public string TimeText => Timestamp.LocalDateTime.ToString("MM-dd HH:mm:ss");
     public string CpuText => $"{CpuPercent:0.0}%";
     public string MemoryText => $"{MemoryPercent:0.0}%";
+}
+
+public sealed class WindowItem
+{
+    public WindowItem(WindowSample sample)
+    {
+        InstanceKey = sample.InstanceKey;
+        OwnerProcessId = sample.OwnerProcessId;
+        Label = sample.Label;
+        State = sample.State;
+        Description = sample.Description;
+    }
+
+    public string InstanceKey { get; }
+    public int OwnerProcessId { get; }
+    public string OwnerProcessText => $"PID {OwnerProcessId}";
+    public string Label { get; }
+    public string State { get; }
+    public string Description { get; }
 }

@@ -10,7 +10,8 @@ Codex Process Monitor is a Windows-focused .NET 8 WPF desktop monitor. It observ
 - 以本地快照的方式支持排查、观察和测试；无法访问的受保护进程字段会被跳过或按实现返回不可用状态。
 - 提供面向 .NET 的基础设施代码，便于上层入口复用，而不要求监视器拥有系统管理权限。
 - CI 在 Windows 上验证 restore、build、test，并生成 `win-x64` 自包含发布包和 SHA-256 校验文件。
-- WPF 工作台提供总览、进程树、Plugin/MCP/Skill、历史与诊断、设置页面；曲线使用轻量自绘控件。
+- WPF 工作台提供总览、进程树、窗口关联、Plugin/MCP/Skill、历史与诊断、设置页面；曲线使用轻量自绘控件。
+- 以一次轻量的原生顶级窗口枚举，把可见/前台 Codex 窗口关联到所属 PID；Chromium 子进程会明确标为共享，避免把它们误认成某一条具体对话。
 - 默认每 2 秒采样；应用自己的历史数据库位于 `%LocalAppData%\CodexProcessMonitor\monitor.sqlite`，不会写入 Codex 目录。
 
 The project:
@@ -73,6 +74,7 @@ The application starts as a normal user (`asInvoker`); it does not register star
 - 进程名、PID、路径、命令行、用户、资源指标和导出文件可能属于敏感信息。分享日志、截图或发布包前，请先审查并脱敏。
 - 受保护进程和跨用户进程可能无法完整读取；不要为了获取字段而以管理员身份运行，除非你的组织明确要求并理解其影响。
 - 两个 Codex 日志库（`%USERPROFILE%\.codex\logs_2.sqlite` 与 `%USERPROFILE%\.codex\sqlite\logs_2.sqlite`）分别以只读连接追踪；仅允许 `id`、时间、等级、target、module_path、file、line、thread_id、process_uuid、estimated_bytes 等元数据列，绝不读取或保存 `feedback_log_body`。
+- 窗口关联只读取顶级窗口的 PID、可见/最小化/前台状态和尺寸；不读取窗口标题、辅助功能树、对话标题或对话内容，也不会把窗口关联写入历史库或诊断报告。
 - 本地历史批处理保留进程明细 7 天、5 分钟汇总 30 天；命令行和完整路径不会写入应用历史或导出 CSV。
 - 本仓库忽略 `.codex`、诊断快照、数据库、日志和构建产物；这些内容不应提交到版本库。
 

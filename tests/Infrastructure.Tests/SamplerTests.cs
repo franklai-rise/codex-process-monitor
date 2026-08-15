@@ -28,6 +28,20 @@ public sealed class SamplerTests
         Assert.True(sample.GlobalMemory.TotalPhysicalBytes >= 0);
     }
 
+    [Fact]
+    public void TopLevelWindowSamplerReturnsOnlyRequestedProcessIds()
+    {
+        var requestedIds = new HashSet<int> { Environment.ProcessId };
+        var windows = new WindowsTopLevelWindowSampler().Sample(requestedIds);
+
+        Assert.All(windows, window =>
+        {
+            Assert.Contains(window.ProcessId, requestedIds);
+            Assert.True(window.Width >= 0);
+            Assert.True(window.Height >= 0);
+        });
+    }
+
     private sealed class ThrowingProvider : IProcessCommandLineProvider
     {
         public CommandLineQueryResult TryGetCommandLine(int processId) => throw new InvalidOperationException("fixture failure");

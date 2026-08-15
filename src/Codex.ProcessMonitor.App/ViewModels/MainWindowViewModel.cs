@@ -42,6 +42,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IAsyncDisposab
         MemoryHistory = new ObservableCollection<double>();
         History = new ObservableCollection<HistoryItem>();
         ProcessTree = new ObservableCollection<ProcessNode>();
+        Windows = new ObservableCollection<WindowItem>();
         Capabilities = new ObservableCollection<CapabilityItem>(
             monitor.Capabilities.Select(static sample => new CapabilityItem(sample)));
         Alerts = new ObservableCollection<AlertItem>();
@@ -68,6 +69,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IAsyncDisposab
     public ObservableCollection<double> MemoryHistory { get; }
     public ObservableCollection<HistoryItem> History { get; }
     public ObservableCollection<ProcessNode> ProcessTree { get; }
+    public ObservableCollection<WindowItem> Windows { get; }
     public ObservableCollection<CapabilityItem> Capabilities { get; }
     public ObservableCollection<AlertItem> Alerts { get; }
 
@@ -79,7 +81,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IAsyncDisposab
     public int SelectedPageIndex
     {
         get => _selectedPageIndex;
-        set => SetField(ref _selectedPageIndex, Math.Clamp(value, 0, 3));
+        set => SetField(ref _selectedPageIndex, Math.Clamp(value, 0, 4));
     }
 
     public double CpuPercent
@@ -169,6 +171,17 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IAsyncDisposab
     public string MonitoringStatusText => IsMonitoring ? "实时监控中" : "监控已暂停";
 
     public string AlertSummaryText => $"最近 {Alerts.Count} 条";
+
+    public string WindowSummaryText
+    {
+        get
+        {
+            var foreground = Windows.FirstOrDefault(static window => window.State == "前台");
+            return foreground is null
+                ? $"已关联 {Windows.Count} 个顶级窗口"
+                : $"当前前台：{foreground.Label} → {foreground.OwnerProcessText}";
+        }
+    }
 
     public bool MinimizeToTray
     {
@@ -298,6 +311,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IAsyncDisposab
         }
 
         RebuildProcessTree(snapshot.Processes);
+        RebuildWindows(snapshot.Windows ?? Array.Empty<WindowSample>());
         foreach (var alert in snapshot.Alerts)
         {
             var key = $"{alert.Timestamp.Ticks}:{alert.Title}";
@@ -362,6 +376,17 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IAsyncDisposab
 
         var currentKeys = nodes.Keys.ToHashSet(StringComparer.Ordinal);
         _expandedProcessKeys.RemoveWhere(key => !currentKeys.Contains(key));
+    }
+
+    private void RebuildWindows(IReadOnlyList<WindowSample> samples)
+    {
+        Windows.Clear();
+        foreach (var sample in samples)
+        {
+            Windows.Add(new WindowItem(sample));
+        }
+
+        OnPropertyChanged(nameof(WindowSummaryText));
     }
 
     private static IEnumerable<ProcessNode> Flatten(IEnumerable<ProcessNode> roots)

@@ -338,13 +338,18 @@ public sealed class WindowsRuntimeMonitorSource : IMonitorSource, IHistoryBatchS
             message: "系统可用物理内存已持续低于 2 GB。"),
     });
     private readonly WindowsProcessSampler _sampler;
+    private readonly IWindowsWindowSampler _windowSampler;
     private readonly Dictionary<string, CoreProcessSample> _previousProcesses = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, string> _windowLabels = new(StringComparer.Ordinal);
     private readonly int _logicalProcessorCount = Math.Max(1, Environment.ProcessorCount);
+    private int _nextWindowLabel = 1;
     private SystemTimesSnapshot? _previousSystemTimes;
     private ProcessTreeSnapshot _lastRetainedTree = ProcessTreeSnapshot.Empty(DateTimeOffset.UtcNow);
     private GlobalMemorySnapshot _lastGlobalMemory = new(DateTimeOffset.UtcNow, 0, 0, 0, 0, 0, 0, 0);
 
-    public WindowsRuntimeMonitorSource(WindowsProcessSampler? sampler = null)
+    public WindowsRuntimeMonitorSource(
+        WindowsProcessSampler? sampler = null,
+        IWindowsWindowSampler? windowSampler = null)
     {
         _sampler = sampler ?? new WindowsProcessSampler(new ProcessSamplerOptions
         {
@@ -356,6 +361,7 @@ public sealed class WindowsRuntimeMonitorSource : IMonitorSource, IHistoryBatchS
             IncludeMemoryCounters = true,
             MaxProcesses = 4096
         });
+        _windowSampler = windowSampler ?? new WindowsTopLevelWindowSampler();
     }
 
     public MonitorSnapshot Capture(CancellationToken cancellationToken)
@@ -368,6 +374,9 @@ public sealed class WindowsRuntimeMonitorSource : IMonitorSource, IHistoryBatchS
         var retained = SelectCodexTree(allProcesses, roots, detachedPluginHosts);
         _lastRetainedTree = new ProcessTreeSnapshot(systemSample.CapturedAtUtc, retained, Array.Empty<ThreadInfo>());
         _lastGlobalMemory = systemSample.GlobalMemory;
+        var retainedIds = retained.Select(static process => process.ProcessId).ToHashSet();
+        var nativeWindows = _windowSampler.Sample(retainedIds, cancellationToken);
+        var windowProjection = ProjectWindows(retained, nativeWindows);
 
         var processSamples = new List<AppProcessSample>(retained.Count);
         var currentKeys = new HashSet<string>(StringComparer.Ordinal);
@@ -385,6 +394,9 @@ public sealed class WindowsRuntimeMonitorSource : IMonitorSource, IHistoryBatchS
 
             var cpuPercent = derived?.CpuPercent ?? 0;
             var ioRate = derived is null ? 0 : derived.ReadBytesPerSecond + derived.WriteBytesPerSecond;
+            var windowAssociation = windowProjection.Associations.GetValueOrDefault(
+                process.ProcessId,
+                ProcessWindowAssociation.None);
             processSamples.Add(new AppProcessSample(
                 process.ProcessId,
                 process.ParentProcessId,
@@ -392,7 +404,9 @@ public sealed class WindowsRuntimeMonitorSource : IMonitorSource, IHistoryBatchS
                 cpuPercent,
                 Math.Max(0, process.WorkingSetBytes),
                 BuildStatus(process, ioRate),
-                InstanceKey: stableKey));
+                InstanceKey: stableKey,
+                WindowAssociation: windowAssociation.Text,
+                WindowAssociationKind: windowAssociation.Kind));
         }
 
         foreach (var staleKey in _previousProcesses.Keys.Where(key => !currentKeys.Contains(key)).ToArray())
@@ -436,7 +450,8 @@ public sealed class WindowsRuntimeMonitorSource : IMonitorSource, IHistoryBatchS
             usedBytes,
             processSamples.Count,
             processSamples.OrderByDescending(static process => process.CpuPercent).ToArray(),
-            alerts);
+            alerts,
+            windowProjection.Windows);
     }
 
     public IReadOnlyList<CapabilitySample> GetCapabilities()
@@ -618,6 +633,140 @@ public sealed class WindowsRuntimeMonitorSource : IMonitorSource, IHistoryBatchS
             .OrderBy(static process => process.ParentProcessId)
             .ThenBy(static process => process.ProcessId)
             .ToArray();
+    }
+
+    /// <summary>
+    /// Builds a stable, UI-only map from native desktop windows to the
+    /// evidence-backed Codex tree. A Chromium renderer is intentionally marked
+    /// as shared: Windows does not expose a trustworthy one-renderer-to-thread
+    /// relationship, even when a renderer is an ancestor/descendant of a
+    /// visible ChatGPT window.
+    /// </summary>
+    private WindowProjection ProjectWindows(
+        IReadOnlyList<ProcessInfo> processes,
+        IReadOnlyList<DesktopWindowInfo> nativeWindows)
+    {
+        var activeKeys = new HashSet<string>(StringComparer.Ordinal);
+        var windows = new List<WindowSample>(nativeWindows.Count);
+        foreach (var nativeWindow in nativeWindows)
+        {
+            var key = $"{nativeWindow.ProcessId}:{nativeWindow.Handle.ToInt64():X}";
+            activeKeys.Add(key);
+            if (!_windowLabels.TryGetValue(key, out var label))
+            {
+                label = $"窗口 {_nextWindowLabel++}";
+                _windowLabels[key] = label;
+            }
+
+            var state = nativeWindow.IsForeground
+                ? "前台"
+                : nativeWindow.IsMinimized
+                    ? "最小化"
+                    : nativeWindow.IsVisible
+                        ? "可见"
+                        : "隐藏";
+            windows.Add(new WindowSample(
+                key,
+                nativeWindow.ProcessId,
+                label,
+                state,
+                $"顶级原生窗口 → PID {nativeWindow.ProcessId}；不读取窗口标题或对话内容。"));
+        }
+
+        foreach (var staleKey in _windowLabels.Keys.Where(key => !activeKeys.Contains(key)).ToArray())
+        {
+            _windowLabels.Remove(staleKey);
+        }
+
+        var orderedWindows = windows
+            .OrderByDescending(static window => window.State == "前台")
+            .ThenBy(static window => window.Label, StringComparer.Ordinal)
+            .ToArray();
+        var byOwner = orderedWindows
+            .GroupBy(static window => window.OwnerProcessId)
+            .ToDictionary(static group => group.Key, static group => group.ToArray());
+        var processesById = processes
+            .GroupBy(static process => process.ProcessId)
+            .Where(static group => group.Count() == 1)
+            .ToDictionary(static group => group.Key, static group => group.Single());
+        var associations = new Dictionary<int, ProcessWindowAssociation>();
+
+        foreach (var process in processes)
+        {
+            if (byOwner.TryGetValue(process.ProcessId, out var directWindows))
+            {
+                associations[process.ProcessId] = new ProcessWindowAssociation(
+                    DescribeWindows(directWindows, "直接所有者"),
+                    "direct");
+                continue;
+            }
+
+            var ancestorWindows = FindAncestorWindows(process, processesById, byOwner);
+            if (ancestorWindows.Count > 0)
+            {
+                var isChromiumChild = IsChromiumChild(process);
+                associations[process.ProcessId] = isChromiumChild
+                    ? new ProcessWindowAssociation(
+                        $"{DescribeChromiumChild(process)} · {DescribeWindowLabels(ancestorWindows)}（无法按对话确认）",
+                        "shared-chromium")
+                    : new ProcessWindowAssociation(
+                        DescribeWindows(ancestorWindows, "父链关联"),
+                        "ancestor");
+                continue;
+            }
+
+            associations[process.ProcessId] = ProcessWindowAssociation.None;
+        }
+
+        return new WindowProjection(orderedWindows, associations);
+    }
+
+    private static IReadOnlyList<WindowSample> FindAncestorWindows(
+        ProcessInfo process,
+        IReadOnlyDictionary<int, ProcessInfo> processesById,
+        IReadOnlyDictionary<int, WindowSample[]> windowsByOwner)
+    {
+        var visited = new HashSet<int> { process.ProcessId };
+        var parentId = process.ParentProcessId;
+        while (parentId > 0 && visited.Add(parentId))
+        {
+            if (windowsByOwner.TryGetValue(parentId, out var windows))
+            {
+                return windows;
+            }
+
+            if (!processesById.TryGetValue(parentId, out var parent))
+            {
+                break;
+            }
+
+            parentId = parent.ParentProcessId;
+        }
+
+        return Array.Empty<WindowSample>();
+    }
+
+    private static string DescribeWindows(IReadOnlyList<WindowSample> windows, string relation)
+        => $"{DescribeWindowLabels(windows)} · {relation}";
+
+    private static string DescribeWindowLabels(IReadOnlyList<WindowSample> windows)
+        => string.Join("、", windows.Take(2).Select(static window => $"{window.Label} {window.State}"))
+            + (windows.Count > 2 ? $" 等 {windows.Count} 个" : string.Empty);
+
+    private static bool IsChromiumChild(ProcessInfo process)
+        => Path.GetFileNameWithoutExtension(process.ImageName)
+            .Equals("chatgpt", StringComparison.OrdinalIgnoreCase);
+
+    private static string DescribeChromiumChild(ProcessInfo process)
+        => process.Role == ProcessRole.Renderer ? "共享渲染器" : "共享 Chromium 子进程";
+
+    private sealed record WindowProjection(
+        IReadOnlyList<WindowSample> Windows,
+        IReadOnlyDictionary<int, ProcessWindowAssociation> Associations);
+
+    private sealed record ProcessWindowAssociation(string Text, string Kind)
+    {
+        public static ProcessWindowAssociation None { get; } = new("无顶级窗口 · 后台子进程", "none");
     }
 
     private static bool IsCodexDesktopRoot(ProcessInfo process)

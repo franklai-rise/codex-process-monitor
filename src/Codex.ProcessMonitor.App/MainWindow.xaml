@@ -57,9 +57,12 @@
                                 <StackPanel Orientation="Horizontal"><TextBlock Text="◇" Width="28" Foreground="{StaticResource AccentAltBrush}" /><TextBlock Text="进程与资源" /></StackPanel>
                             </Button>
                             <Button Style="{StaticResource SidebarButton}" Command="{Binding NavigateCommand}" CommandParameter="2">
-                                <StackPanel Orientation="Horizontal"><TextBlock Text="▤" Width="28" Foreground="{StaticResource WarningBrush}" /><TextBlock Text="历史与诊断" /></StackPanel>
+                                <StackPanel Orientation="Horizontal"><TextBlock Text="▣" Width="28" Foreground="{StaticResource SuccessBrush}" /><TextBlock Text="窗口关联" /></StackPanel>
                             </Button>
                             <Button Style="{StaticResource SidebarButton}" Command="{Binding NavigateCommand}" CommandParameter="3">
+                                <StackPanel Orientation="Horizontal"><TextBlock Text="▤" Width="28" Foreground="{StaticResource WarningBrush}" /><TextBlock Text="历史与诊断" /></StackPanel>
+                            </Button>
+                            <Button Style="{StaticResource SidebarButton}" Command="{Binding NavigateCommand}" CommandParameter="4">
                                 <StackPanel Orientation="Horizontal"><TextBlock Text="⚙" Width="28" Foreground="{StaticResource MutedTextBrush}" /><TextBlock Text="设置" /></StackPanel>
                             </Button>
                         </StackPanel>
@@ -170,12 +173,13 @@
                                                         <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}" />
                                                     </Style>
                                                     <HierarchicalDataTemplate DataType="{x:Type models:ProcessNode}" ItemsSource="{Binding Children}">
-                                                        <Grid MinWidth="550">
-                                                            <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="70" /><ColumnDefinition Width="90" /><ColumnDefinition Width="92" /></Grid.ColumnDefinitions>
+                                                        <Grid MinWidth="700">
+                                                            <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="70" /><ColumnDefinition Width="90" /><ColumnDefinition Width="92" /><ColumnDefinition Width="170" /></Grid.ColumnDefinitions>
                                                             <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" />
                                                             <TextBlock Grid.Column="1" Text="{Binding ProcessId}" Foreground="{StaticResource MutedTextBrush}" />
                                                             <TextBlock Grid.Column="2" Text="{Binding CpuText}" Foreground="{StaticResource AccentBrush}" />
                                                             <TextBlock Grid.Column="3" Text="{Binding MemoryText}" Foreground="{StaticResource MutedTextBrush}" />
+                                                            <TextBlock Grid.Column="4" Text="{Binding WindowAssociation}" Foreground="{StaticResource MutedTextBrush}" TextTrimming="CharacterEllipsis" />
                                                         </Grid>
                                                     </HierarchicalDataTemplate>
                                                 </TreeView.Resources>
@@ -210,7 +214,7 @@
                                 <Border Style="{StaticResource CardBorder}" Margin="0,0,0,14">
                                     <DockPanel>
                                         <StackPanel DockPanel.Dock="Left"><TextBlock Text="进程资源" FontSize="16" FontWeight="Bold" /><TextBlock Text="按 CPU 使用率排序 · 只读观察" Foreground="{StaticResource MutedTextBrush}" FontSize="11" Margin="0,3,0,0" /></StackPanel>
-                                        <TextBlock DockPanel.Dock="Right" Text="父子关系在可用时自动归组" Foreground="{StaticResource MutedTextBrush}" FontSize="11" VerticalAlignment="Center" />
+                                        <TextBlock DockPanel.Dock="Right" Text="父子关系与原生窗口归属自动关联" Foreground="{StaticResource MutedTextBrush}" FontSize="11" VerticalAlignment="Center" />
                                     </DockPanel>
                                 </Border>
                                 <Grid Grid.Row="1">
@@ -222,13 +226,14 @@
                                                     <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}" />
                                                 </Style>
                                                 <HierarchicalDataTemplate DataType="{x:Type models:ProcessNode}" ItemsSource="{Binding Children}">
-                                                    <Grid MinWidth="620" Margin="2,3">
-                                                        <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="90" /><ColumnDefinition Width="100" /><ColumnDefinition Width="110" /><ColumnDefinition Width="100" /></Grid.ColumnDefinitions>
+                                                    <Grid MinWidth="820" Margin="2,3">
+                                                        <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="72" /><ColumnDefinition Width="82" /><ColumnDefinition Width="100" /><ColumnDefinition Width="112" /><ColumnDefinition Width="230" /></Grid.ColumnDefinitions>
                                                         <TextBlock Text="{Binding Name}" FontSize="12" />
                                                         <TextBlock Grid.Column="1" Text="{Binding ProcessId}" Foreground="{StaticResource MutedTextBrush}" />
                                                         <TextBlock Grid.Column="2" Text="{Binding CpuText}" Foreground="{StaticResource AccentBrush}" />
                                                         <TextBlock Grid.Column="3" Text="{Binding MemoryText}" Foreground="{StaticResource AccentAltBrush}" />
                                                         <TextBlock Grid.Column="4" Text="{Binding Status}" Foreground="{StaticResource MutedTextBrush}" />
+                                                        <TextBlock Grid.Column="5" Text="{Binding WindowAssociation}" Foreground="{StaticResource MutedTextBrush}" TextTrimming="CharacterEllipsis" />
                                                     </Grid>
                                                 </HierarchicalDataTemplate>
                                             </TreeView.Resources>
@@ -256,6 +261,43 @@
                                                 </ListView.ItemTemplate>
                                             </ListView>
                                         </Grid>
+                                    </Border>
+                                </Grid>
+                            </Grid>
+                        </TabItem>
+
+                        <TabItem Header="窗口关联">
+                            <Grid>
+                                <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="*" /></Grid.RowDefinitions>
+                                <Border Style="{StaticResource CardBorder}" Margin="0,0,0,14">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                        <StackPanel>
+                                            <TextBlock Text="Codex 窗口 ↔ 进程" FontSize="16" FontWeight="Bold" />
+                                            <TextBlock Text="仅枚举顶级原生窗口；不读取窗口标题、对话内容或界面控件。" Foreground="{StaticResource MutedTextBrush}" FontSize="11" Margin="0,3,0,0" />
+                                        </StackPanel>
+                                        <TextBlock Grid.Column="1" Text="{Binding WindowSummaryText}" Foreground="{StaticResource AccentAltBrush}" FontSize="11" VerticalAlignment="Center" />
+                                    </Grid>
+                                </Border>
+                                <Grid Grid.Row="1">
+                                    <Grid.RowDefinitions><RowDefinition Height="*" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
+                                    <Border Style="{StaticResource CardBorder}" Padding="8" Margin="0,0,0,14">
+                                        <ListView ItemsSource="{Binding Windows}" BorderThickness="0">
+                                            <ListView.ItemTemplate>
+                                                <DataTemplate>
+                                                    <Grid Margin="4,5">
+                                                        <Grid.ColumnDefinitions><ColumnDefinition Width="110" /><ColumnDefinition Width="95" /><ColumnDefinition Width="90" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                                                        <TextBlock Text="{Binding Label}" FontWeight="SemiBold" />
+                                                        <TextBlock Grid.Column="1" Text="{Binding OwnerProcessText}" Foreground="{StaticResource AccentBrush}" />
+                                                        <TextBlock Grid.Column="2" Text="{Binding State}" Foreground="{StaticResource SuccessBrush}" />
+                                                        <TextBlock Grid.Column="3" Text="{Binding Description}" Foreground="{StaticResource MutedTextBrush}" TextTrimming="CharacterEllipsis" />
+                                                    </Grid>
+                                                </DataTemplate>
+                                            </ListView.ItemTemplate>
+                                        </ListView>
+                                    </Border>
+                                    <Border Grid.Row="1" Style="{StaticResource CardBorder}">
+                                        <TextBlock Text="说明：直接所有者表示该 PID 拥有顶级窗口。ChatGPT 的 Chromium 渲染器通常共享同一窗口，因此会标记为“共享渲染器”，不能可靠地对应到某一条具体对话。" Foreground="{StaticResource MutedTextBrush}" FontSize="11" TextWrapping="Wrap" />
                                     </Border>
                                 </Grid>
                             </Grid>
@@ -308,7 +350,7 @@
                                             <TextBlock Text="采样间隔" Foreground="{StaticResource MutedTextBrush}" FontSize="11" Margin="0,13,0,2" />
                                             <TextBlock Text="2 秒（后台 PeriodicTimer + Channel）" FontSize="13" />
                                             <TextBlock Text="数据范围" Foreground="{StaticResource MutedTextBrush}" FontSize="11" Margin="0,13,0,2" />
-                                            <TextBlock Text="仅本机进程、CPU、内存与本地适配能力；不会执行进程控制，也不会上传。" FontSize="13" TextWrapping="Wrap" />
+                                            <TextBlock Text="仅本机进程、CPU、内存和顶级窗口归属；不读取窗口标题或对话内容，不会执行进程控制，也不会上传。" FontSize="13" TextWrapping="Wrap" />
                                         </StackPanel>
                                     </Border>
                                 </StackPanel>

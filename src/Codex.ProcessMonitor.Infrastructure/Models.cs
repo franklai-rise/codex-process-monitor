@@ -72,6 +72,31 @@ public sealed record WindowsSystemSample(
     SystemTimesSnapshot SystemTimes,
     GlobalMemorySnapshot GlobalMemory);
 
+/// <summary>
+/// A privacy-preserving view of a native top-level window.  The monitor keeps
+/// only ownership and state information; it intentionally does not read a
+/// window title, document title, accessibility tree, or conversation content.
+/// </summary>
+public sealed record DesktopWindowInfo(
+    nint Handle,
+    int ProcessId,
+    int ThreadId,
+    bool IsVisible,
+    bool IsForeground,
+    bool IsMinimized,
+    int Width,
+    int Height,
+    string WindowClass);
+
+/// <summary>Read-only top-level window sampler used to connect native windows
+/// to PIDs already proven to be in the Codex process tree.</summary>
+public interface IWindowsWindowSampler
+{
+    IReadOnlyList<DesktopWindowInfo> Sample(
+        IReadOnlySet<int> processIds,
+        CancellationToken cancellationToken = default);
+}
+
 public sealed record ProcessSamplerOptions
 {
     public bool IncludeCommandLines { get; init; } = true;
