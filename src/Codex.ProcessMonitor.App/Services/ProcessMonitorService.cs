@@ -36,14 +36,40 @@ public static class MonitorCompositionRoot
     public static ProcessMonitorService CreateMonitor()
     {
         var source = new WindowsRuntimeMonitorSource();
-        var localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
         HistoryStore? history = null;
-        if (!string.IsNullOrWhiteSpace(localAppData))
+        var historyDirectory = ResolveHistoryDirectory();
+        if (!string.IsNullOrWhiteSpace(historyDirectory))
         {
-            history = new HistoryStore(Path.Combine(localAppData, "CodexProcessMonitor", "monitor.sqlite"));
+            history = new HistoryStore(Path.Combine(historyDirectory, "monitor.sqlite"));
         }
 
         return new ProcessMonitorService(source, historyStore: history);
+    }
+
+    /// <summary>
+    /// Keeps monitor-owned data with the application/project rather than in a
+    /// user profile. An explicit directory can be supplied for portable use;
+    /// otherwise look up from the executable for the repository root and use
+    /// its monitor-data folder.
+    /// </summary>
+    private static string ResolveHistoryDirectory()
+    {
+        var configured = Environment.GetEnvironmentVariable("CODEX_PROCESS_MONITOR_DATA_DIR");
+        if (!string.IsNullOrWhiteSpace(configured))
+        {
+            return Path.GetFullPath(configured);
+        }
+
+        var directory = new DirectoryInfo(AppContext.BaseDirectory);
+        for (var depth = 0; directory is not null && depth < 10; depth++, directory = directory.Parent)
+        {
+            if (File.Exists(Path.Combine(directory.FullName, "Codex.ProcessMonitor.sln")))
+            {
+                return Path.Combine(directory.FullName, "monitor-data");
+            }
+        }
+
+        return Path.Combine(AppContext.BaseDirectory, "monitor-data");
     }
 }
 
