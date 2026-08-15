@@ -1,0 +1,29 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <UseWindowsForms>true</UseWindowsForms>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <EnableDefaultApplicationDefinition>true</EnableDefaultApplicationDefinition>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <AssemblyName>Codex.ProcessMonitor.App</AssemblyName>
+    <RootNamespace>Codex.ProcessMonitor.App</RootNamespace>
+    <Platforms>AnyCPU</Platforms>
+    <PlatformTarget>AnyCPU</PlatformTarget>
+    <Prefer32Bit>false</Prefer32Bit>
+    <ApplicationIcon />
+    <IncludeSharedProjects Condition="'$(IncludeSharedProjects)' == ''">true</IncludeSharedProjects>
+  </PropertyGroup>
+
+  <!-- The two project references are intentionally conditional while the shared
+       Core/Infrastructure contracts are being introduced. Once those projects
+       exist at the agreed paths, this app consumes them automatically. -->
+  <ItemGroup>
+    <ProjectReference Include="../Codex.ProcessMonitor.Core/Codex.ProcessMonitor.Core.csproj"
+                      Condition="'$(IncludeSharedProjects)' != 'false' and Exists('../Codex.ProcessMonitor.Core/Codex.ProcessMonitor.Core.csproj')" />
+    <ProjectReference Include="../Codex.ProcessMonitor.Infrastructure/Codex.ProcessMonitor.Infrastructure.csproj"
+                      Condition="'$(IncludeSharedProjects)' != 'false' and Exists('../Codex.ProcessMonitor.Infrastructure/Codex.ProcessMonitor.Infrastructure.csproj')" />
+  </ItemGroup>
+</Project>

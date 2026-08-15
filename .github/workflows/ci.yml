@@ -1,0 +1,175 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+      - master
+    tags:
+      - 'v*'
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  DOTNET_VERSION: '8.0.x'
+  CONFIGURATION: Release
+  RUNTIME: win-x64
+
+jobs:
+  build-test-publish:
+    name: Restore, build, test, publish
+    runs-on: windows-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Resolve .NET target
+        id: target
+        shell: pwsh
+        run: |
+          $excluded = '\\(?:bin|obj|artifacts|TestResults|\.git|\.codex)\\'
+          $testProjects = @()
+          $solution = @(
+            Get-ChildItem -Path . -Filter '*.sln' -File -Recurse -ErrorAction SilentlyContinue |
+              Where-Object { $_.FullName -notmatch $excluded }
+          ) | Select-Object -First 1
+
+          if ($null -ne $solution) {
+            $target = $solution.FullName
+          }
+          else {
+            $projects = @(
+              Get-ChildItem -Path . -Filter '*.csproj' -File -Recurse -ErrorAction SilentlyContinue |
+                Where-Object {
+                  $_.FullName -notmatch $excluded -and
+                  $_.FullName -notmatch '\\(?:tests?|test)\\'
+                }
+            )
+
+            if ($projects.Count -eq 0) {
+              throw 'No .sln or non-test .csproj was found.'
+            }
+
+            $target = $projects[0].FullName
+            if ($projects.Count -gt 1) {
+              $named = @(
+                $projects | Where-Object {
+                  (Get-Content -LiteralPath $_.FullName -Raw) -match '<OutputType>\s*(?:WinExe|Exe)\s*</OutputType>' -or
+                  $_.BaseName -match '(?i)(\.App|\.Cli)$'
+                }
+              )
+              if ($named.Count -eq 1) {
+                $target = $named[0].FullName
+              }
+              else {
+                throw 'More than one application project was found and no solution identifies the build target.'
+              }
+            }
+
+            $testProjects = @(
+              Get-ChildItem -Path . -Filter '*.csproj' -File -Recurse -ErrorAction SilentlyContinue |
+                Where-Object {
+                  $_.FullName -notmatch $excluded -and
+                  (
+                    $_.FullName -match '\\(?:tests?|test)\\' -or
+                    (Get-Content -LiteralPath $_.FullName -Raw) -match '<IsTestProject>\s*true\s*</IsTestProject>'
+                  )
+                }
+            )
+          }
+
+          "path=$target" >> $env:GITHUB_OUTPUT
+          "test_projects=$($testProjects.FullName -join '|')" >> $env:GITHUB_OUTPUT
+          Write-Host "Using .NET target: $target"
+
+      - name: Restore
+        shell: pwsh
+        run: |
+          dotnet restore "${{ steps.target.outputs.path }}"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $testProjectList = '${{ steps.target.outputs.test_projects }}'
+          $testProjects = if ([string]::IsNullOrWhiteSpace($testProjectList)) { @() } else { @($testProjectList -split '\|') }
+          foreach ($testProject in $testProjects) {
+            dotnet restore $testProject
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
+
+      - name: Build
+        shell: pwsh
+        run: |
+          dotnet build "${{ steps.target.outputs.path }}" --configuration $env:CONFIGURATION --no-restore
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $testProjectList = '${{ steps.target.outputs.test_projects }}'
+          $testProjects = if ([string]::IsNullOrWhiteSpace($testProjectList)) { @() } else { @($testProjectList -split '\|') }
+          foreach ($testProject in $testProjects) {
+            dotnet build $testProject --configuration $env:CONFIGURATION --no-restore
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
+
+      - name: Test
+        shell: pwsh
+        run: |
+          $testProjectList = '${{ steps.target.outputs.test_projects }}'
+          $testProjects = if ([string]::IsNullOrWhiteSpace($testProjectList)) { @() } else { @($testProjectList -split '\|') }
+          if ($testProjects.Count -eq 0) {
+            dotnet test "${{ steps.target.outputs.path }}" --configuration $env:CONFIGURATION --no-build --logger "trx;LogFileName=test-results.trx" --results-directory TestResults
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
+          else {
+            foreach ($testProject in $testProjects) {
+              dotnet test $testProject --configuration $env:CONFIGURATION --no-build --no-restore --logger "trx;LogFileName=$([IO.Path]::GetFileNameWithoutExtension($testProject)).trx" --results-directory TestResults
+              if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+            }
+          }
+
+      - name: Publish self-contained win-x64 package
+        shell: pwsh
+        run: |
+          $version = if ('${{ github.ref_type }}' -eq 'tag') { '${{ github.ref_name }}' } else { '0.0.0-ci' }
+          & pwsh -NoProfile -File .\scripts\publish.ps1 `
+            -Configuration $env:CONFIGURATION `
+            -Runtime $env:RUNTIME `
+            -OutputRoot artifacts `
+            -Version $version
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Codex.ProcessMonitor-${{ github.run_id }}-${{ env.RUNTIME }}
+          path: |
+            artifacts/*.zip
+            artifacts/*.sha256
+          if-no-files-found: error
+          retention-days: 14
+
+  release:
+    name: Release tagged package
+    needs: build-test-publish
+    if: ${{ github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v') }}
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download package artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: Codex.ProcessMonitor-${{ github.run_id }}-${{ env.RUNTIME }}
+          path: artifacts
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          generate_release_notes: true
+          files: |
+            artifacts/*.zip
+            artifacts/*.sha256

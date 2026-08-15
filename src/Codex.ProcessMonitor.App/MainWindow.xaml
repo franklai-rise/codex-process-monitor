@@ -1,0 +1,316 @@
+<Window x:Class="Codex.ProcessMonitor.App.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:controls="clr-namespace:Codex.ProcessMonitor.App.Controls"
+        xmlns:models="clr-namespace:Codex.ProcessMonitor.App.Models"
+        Title="Codex 进程监视器"
+        Width="1360" Height="860" MinWidth="1080" MinHeight="680"
+        WindowStartupLocation="CenterScreen"
+        WindowStyle="None" ResizeMode="CanResize"
+        Background="{StaticResource WindowBackgroundBrush}"
+        Loaded="OnLoaded" Closing="OnClosing" StateChanged="OnStateChanged">
+    <Border BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="10">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="42" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+
+            <Border Grid.Row="0" Background="#0B111B" MouseLeftButtonDown="OnTitleBarMouseLeftButtonDown">
+                <DockPanel LastChildFill="True">
+                    <StackPanel Orientation="Horizontal" DockPanel.Dock="Left" Margin="16,0,0,0" VerticalAlignment="Center">
+                        <Border Width="9" Height="9" CornerRadius="5" Background="{StaticResource AccentAltBrush}" Margin="0,0,8,0" />
+                        <TextBlock Text="Codex 进程监视器" FontSize="13" FontWeight="SemiBold" />
+                        <TextBlock Text="  ·  本地只读工作台" Foreground="{StaticResource MutedTextBrush}" FontSize="11" VerticalAlignment="Center" />
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" DockPanel.Dock="Right" VerticalAlignment="Center" Margin="0,0,6,0">
+                        <Button Width="36" Height="30" Padding="0" Content="—" FontSize="16" Click="OnMinimizeClick" ToolTip="最小化" />
+                        <Button Width="36" Height="30" Padding="0" Content="×" FontSize="17" Click="OnCloseClick" ToolTip="关闭" />
+                    </StackPanel>
+                    <TextBlock Text="{Binding NoticeText}" Foreground="{StaticResource MutedTextBrush}" FontSize="11"
+                               VerticalAlignment="Center" HorizontalAlignment="Right" Margin="0,0,20,0" TextTrimming="CharacterEllipsis" />
+                </DockPanel>
+            </Border>
+
+            <Grid Grid.Row="1">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="220" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+
+                <Border Grid.Column="0" Background="{StaticResource SidebarBrush}" Padding="14,20,14,14">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+                        <StackPanel Grid.Row="0" Margin="8,0,8,22">
+                            <TextBlock Text="资源脉搏" FontSize="12" Foreground="{StaticResource AccentBrush}" FontWeight="SemiBold" />
+                            <TextBlock Text="Process Monitor" FontSize="17" FontWeight="Bold" Margin="0,3,0,0" />
+                        </StackPanel>
+                        <StackPanel Grid.Row="1">
+                            <Button Style="{StaticResource SidebarButton}" Command="{Binding NavigateCommand}" CommandParameter="0">
+                                <StackPanel Orientation="Horizontal"><TextBlock Text="◉" Width="28" Foreground="{StaticResource AccentBrush}" /><TextBlock Text="总览" /></StackPanel>
+                            </Button>
+                            <Button Style="{StaticResource SidebarButton}" Command="{Binding NavigateCommand}" CommandParameter="1">
+                                <StackPanel Orientation="Horizontal"><TextBlock Text="◇" Width="28" Foreground="{StaticResource AccentAltBrush}" /><TextBlock Text="进程与资源" /></StackPanel>
+                            </Button>
+                            <Button Style="{StaticResource SidebarButton}" Command="{Binding NavigateCommand}" CommandParameter="2">
+                                <StackPanel Orientation="Horizontal"><TextBlock Text="▤" Width="28" Foreground="{StaticResource WarningBrush}" /><TextBlock Text="历史与诊断" /></StackPanel>
+                            </Button>
+                            <Button Style="{StaticResource SidebarButton}" Command="{Binding NavigateCommand}" CommandParameter="3">
+                                <StackPanel Orientation="Horizontal"><TextBlock Text="⚙" Width="28" Foreground="{StaticResource MutedTextBrush}" /><TextBlock Text="设置" /></StackPanel>
+                            </Button>
+                        </StackPanel>
+                        <Border Grid.Row="2" Background="#16263B" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="9" Padding="11">
+                            <StackPanel>
+                                <StackPanel Orientation="Horizontal">
+                                    <Ellipse Width="8" Height="8" Fill="{StaticResource SuccessBrush}" Margin="0,0,7,0" />
+                                    <TextBlock Text="{Binding MonitoringStatusText}" FontSize="11" FontWeight="SemiBold" />
+                                </StackPanel>
+                                <TextBlock Text="{Binding SamplingStatus}" Foreground="{StaticResource MutedTextBrush}" FontSize="10" Margin="15,5,0,0" />
+                                <TextBlock Text="后台间隔 2 秒 · 不自启" Foreground="{StaticResource MutedTextBrush}" FontSize="10" Margin="15,2,0,0" />
+                            </StackPanel>
+                        </Border>
+                    </Grid>
+                </Border>
+
+                <Grid Grid.Column="1" Margin="24,20,24,22">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+                    <DockPanel Grid.Row="0" Margin="0,0,0,18">
+                        <StackPanel DockPanel.Dock="Left">
+                            <TextBlock Text="监控工作台" FontSize="24" FontWeight="Bold" />
+                            <TextBlock Text="轻量采样，快速定位本机资源变化" Foreground="{StaticResource MutedTextBrush}" FontSize="12" Margin="0,4,0,0" />
+                        </StackPanel>
+                        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+                            <TextBlock Text="{Binding LastUpdatedText}" Foreground="{StaticResource MutedTextBrush}" FontSize="11" VerticalAlignment="Center" Margin="0,0,14,0" />
+                            <Button Style="{StaticResource PrimaryButton}" Content="↻ 立即刷新" Command="{Binding RefreshCommand}" />
+                        </StackPanel>
+                    </DockPanel>
+
+                    <TabControl Grid.Row="1" SelectedIndex="{Binding SelectedPageIndex}">
+                        <TabControl.Resources>
+                            <!-- Navigation is provided by the sidebar; keep the
+                                 TabControl's content presenter but hide duplicate tabs. -->
+                            <Style TargetType="{x:Type TabItem}">
+                                <Setter Property="Visibility" Value="Collapsed" />
+                            </Style>
+                        </TabControl.Resources>
+                        <TabItem Header="总览">
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="108" />
+                                    <RowDefinition Height="232" />
+                                    <RowDefinition Height="*" />
+                                </Grid.RowDefinitions>
+                                <Grid Grid.Row="0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <Border Grid.Column="0" Style="{StaticResource CardBorder}" Margin="0,0,8,0">
+                                        <Grid><Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="*" /></Grid.RowDefinitions>
+                                            <TextBlock Text="CPU 使用率" Foreground="{StaticResource MutedTextBrush}" FontSize="12" />
+                                            <TextBlock Grid.Row="1" Text="{Binding CpuPercentText}" Foreground="{StaticResource AccentBrush}" FontSize="28" FontWeight="Bold" VerticalAlignment="Bottom" />
+                                        </Grid>
+                                    </Border>
+                                    <Border Grid.Column="1" Style="{StaticResource CardBorder}" Margin="4,0,4,0">
+                                        <Grid><Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="*" /></Grid.RowDefinitions>
+                                            <TextBlock Text="内存使用率" Foreground="{StaticResource MutedTextBrush}" FontSize="12" />
+                                            <TextBlock Grid.Row="1" Text="{Binding MemoryPercentText}" Foreground="{StaticResource AccentAltBrush}" FontSize="28" FontWeight="Bold" VerticalAlignment="Bottom" />
+                                        </Grid>
+                                    </Border>
+                                    <Border Grid.Column="2" Style="{StaticResource CardBorder}" Margin="4,0,4,0">
+                                        <Grid><Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="*" /></Grid.RowDefinitions>
+                                            <TextBlock Text="活动进程" Foreground="{StaticResource MutedTextBrush}" FontSize="12" />
+                                            <TextBlock Grid.Row="1" Text="{Binding ProcessCountText}" Foreground="{StaticResource WarningBrush}" FontSize="28" FontWeight="Bold" VerticalAlignment="Bottom" />
+                                        </Grid>
+                                    </Border>
+                                    <Border Grid.Column="3" Style="{StaticResource CardBorder}" Margin="8,0,0,0">
+                                        <Grid><Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="*" /></Grid.RowDefinitions>
+                                            <TextBlock Text="已用物理内存" Foreground="{StaticResource MutedTextBrush}" FontSize="12" />
+                                            <TextBlock Grid.Row="1" Text="{Binding WorkingSetText}" Foreground="{StaticResource TextBrush}" FontSize="23" FontWeight="Bold" VerticalAlignment="Bottom" />
+                                        </Grid>
+                                    </Border>
+                                </Grid>
+
+                                <Grid Grid.Row="1" Margin="0,14,0,14">
+                                    <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                                    <Border Grid.Column="0" Style="{StaticResource CardBorder}" Margin="0,0,7,0">
+                                        <Grid>
+                                            <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="*" /></Grid.RowDefinitions>
+                                            <DockPanel><TextBlock Text="CPU 趋势" FontSize="13" FontWeight="SemiBold" /><TextBlock DockPanel.Dock="Right" Text="最近 60 个采样点" Foreground="{StaticResource MutedTextBrush}" FontSize="10" /></DockPanel>
+                                            <controls:Sparkline Grid.Row="1" Margin="0,10,0,0" Values="{Binding CpuHistory}" Stroke="{StaticResource AccentBrush}" Fill="#2663B3FF" />
+                                        </Grid>
+                                    </Border>
+                                    <Border Grid.Column="1" Style="{StaticResource CardBorder}" Margin="7,0,0,0">
+                                        <Grid>
+                                            <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="*" /></Grid.RowDefinitions>
+                                            <DockPanel><TextBlock Text="内存趋势" FontSize="13" FontWeight="SemiBold" /><TextBlock DockPanel.Dock="Right" Text="百分比 · 轻量绘制" Foreground="{StaticResource MutedTextBrush}" FontSize="10" /></DockPanel>
+                                            <controls:Sparkline Grid.Row="1" Margin="0,10,0,0" Values="{Binding MemoryHistory}" Stroke="{StaticResource AccentAltBrush}" Fill="#267DE0C2" />
+                                        </Grid>
+                                    </Border>
+                                </Grid>
+
+                                <Grid Grid.Row="2">
+                                    <Grid.ColumnDefinitions><ColumnDefinition Width="1.25*" /><ColumnDefinition Width="0.75*" /></Grid.ColumnDefinitions>
+                                    <Border Grid.Column="0" Style="{StaticResource CardBorder}" Margin="0,0,7,0">
+                                        <Grid>
+                                            <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="*" /></Grid.RowDefinitions>
+                                            <DockPanel Margin="0,0,0,8"><TextBlock Text="进程树" FontSize="13" FontWeight="SemiBold" /><TextBlock DockPanel.Dock="Right" Text="只读" Foreground="{StaticResource AccentAltBrush}" FontSize="10" /></DockPanel>
+                                            <TreeView Grid.Row="1" ItemsSource="{Binding ProcessTree}" Background="Transparent" BorderThickness="0" Foreground="{StaticResource TextBrush}">
+                                                <TreeView.Resources>
+                                                    <HierarchicalDataTemplate DataType="{x:Type models:ProcessNode}" ItemsSource="{Binding Children}">
+                                                        <Grid MinWidth="550">
+                                                            <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="70" /><ColumnDefinition Width="90" /><ColumnDefinition Width="92" /></Grid.ColumnDefinitions>
+                                                            <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" />
+                                                            <TextBlock Grid.Column="1" Text="{Binding ProcessId}" Foreground="{StaticResource MutedTextBrush}" />
+                                                            <TextBlock Grid.Column="2" Text="{Binding CpuText}" Foreground="{StaticResource AccentBrush}" />
+                                                            <TextBlock Grid.Column="3" Text="{Binding MemoryText}" Foreground="{StaticResource MutedTextBrush}" />
+                                                        </Grid>
+                                                    </HierarchicalDataTemplate>
+                                                </TreeView.Resources>
+                                            </TreeView>
+                                        </Grid>
+                                    </Border>
+                                    <Border Grid.Column="1" Style="{StaticResource CardBorder}" Margin="7,0,0,0">
+                                        <Grid>
+                                            <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="*" /></Grid.RowDefinitions>
+                                            <DockPanel Margin="0,0,0,8"><TextBlock Text="告警" FontSize="13" FontWeight="SemiBold" /><TextBlock DockPanel.Dock="Right" Text="{Binding AlertSummaryText}" Foreground="{StaticResource MutedTextBrush}" FontSize="10" /></DockPanel>
+                                            <ListView Grid.Row="1" ItemsSource="{Binding Alerts}">
+                                                <ListView.ItemTemplate>
+                                                    <DataTemplate>
+                                                        <Grid>
+                                                            <Grid.ColumnDefinitions><ColumnDefinition Width="54" /><ColumnDefinition Width="*" /><ColumnDefinition Width="56" /></Grid.ColumnDefinitions>
+                                                            <TextBlock Text="{Binding Severity}" Foreground="{StaticResource WarningBrush}" FontSize="10" VerticalAlignment="Top" />
+                                                            <StackPanel Grid.Column="1"><TextBlock Text="{Binding Title}" FontWeight="SemiBold" FontSize="11" /><TextBlock Text="{Binding Detail}" Foreground="{StaticResource MutedTextBrush}" FontSize="10" TextWrapping="Wrap" MaxHeight="32" /></StackPanel>
+                                                            <TextBlock Grid.Column="2" Text="{Binding TimeText}" Foreground="{StaticResource MutedTextBrush}" FontSize="10" HorizontalAlignment="Right" />
+                                                        </Grid>
+                                                    </DataTemplate>
+                                                </ListView.ItemTemplate>
+                                            </ListView>
+                                        </Grid>
+                                    </Border>
+                                </Grid>
+                            </Grid>
+                        </TabItem>
+
+                        <TabItem Header="进程与资源">
+                            <Grid>
+                                <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="*" /></Grid.RowDefinitions>
+                                <Border Style="{StaticResource CardBorder}" Margin="0,0,0,14">
+                                    <DockPanel>
+                                        <StackPanel DockPanel.Dock="Left"><TextBlock Text="进程资源" FontSize="16" FontWeight="Bold" /><TextBlock Text="按 CPU 使用率排序 · 只读观察" Foreground="{StaticResource MutedTextBrush}" FontSize="11" Margin="0,3,0,0" /></StackPanel>
+                                        <TextBlock DockPanel.Dock="Right" Text="父子关系在可用时自动归组" Foreground="{StaticResource MutedTextBrush}" FontSize="11" VerticalAlignment="Center" />
+                                    </DockPanel>
+                                </Border>
+                                <Grid Grid.Row="1">
+                                    <Grid.ColumnDefinitions><ColumnDefinition Width="1.35*" /><ColumnDefinition Width="0.65*" /></Grid.ColumnDefinitions>
+                                    <Border Grid.Column="0" Style="{StaticResource CardBorder}" Padding="8" Margin="0,0,7,0">
+                                        <TreeView ItemsSource="{Binding ProcessTree}" Background="Transparent" BorderThickness="0" Foreground="{StaticResource TextBrush}">
+                                            <TreeView.Resources>
+                                                <HierarchicalDataTemplate DataType="{x:Type models:ProcessNode}" ItemsSource="{Binding Children}">
+                                                    <Grid MinWidth="620" Margin="2,3">
+                                                        <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="90" /><ColumnDefinition Width="100" /><ColumnDefinition Width="110" /><ColumnDefinition Width="100" /></Grid.ColumnDefinitions>
+                                                        <TextBlock Text="{Binding Name}" FontSize="12" />
+                                                        <TextBlock Grid.Column="1" Text="{Binding ProcessId}" Foreground="{StaticResource MutedTextBrush}" />
+                                                        <TextBlock Grid.Column="2" Text="{Binding CpuText}" Foreground="{StaticResource AccentBrush}" />
+                                                        <TextBlock Grid.Column="3" Text="{Binding MemoryText}" Foreground="{StaticResource AccentAltBrush}" />
+                                                        <TextBlock Grid.Column="4" Text="{Binding Status}" Foreground="{StaticResource MutedTextBrush}" />
+                                                    </Grid>
+                                                </HierarchicalDataTemplate>
+                                            </TreeView.Resources>
+                                        </TreeView>
+                                    </Border>
+                                    <Border Grid.Column="1" Style="{StaticResource CardBorder}" Padding="14" Margin="7,0,0,0">
+                                        <Grid>
+                                            <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="*" /></Grid.RowDefinitions>
+                                            <StackPanel Margin="0,0,0,8">
+                                                <TextBlock Text="Plugin / MCP / Skill" FontSize="13" FontWeight="SemiBold" />
+                                                <TextBlock Text="当前应用能力与接入状态" Foreground="{StaticResource MutedTextBrush}" FontSize="10" Margin="0,3,0,0" />
+                                            </StackPanel>
+                                            <ListView Grid.Row="1" ItemsSource="{Binding Capabilities}">
+                                                <ListView.ItemTemplate>
+                                                    <DataTemplate>
+                                                        <StackPanel>
+                                                            <DockPanel>
+                                                                <TextBlock Text="{Binding Category}" Foreground="{StaticResource AccentBrush}" FontSize="10" />
+                                                                <TextBlock DockPanel.Dock="Right" Text="{Binding Status}" Foreground="{StaticResource SuccessBrush}" FontSize="10" />
+                                                            </DockPanel>
+                                                            <TextBlock Text="{Binding Name}" FontWeight="SemiBold" FontSize="11" Margin="0,3,0,0" />
+                                                            <TextBlock Text="{Binding Description}" Foreground="{StaticResource MutedTextBrush}" FontSize="10" TextWrapping="Wrap" />
+                                                        </StackPanel>
+                                                    </DataTemplate>
+                                                </ListView.ItemTemplate>
+                                            </ListView>
+                                        </Grid>
+                                    </Border>
+                                </Grid>
+                            </Grid>
+                        </TabItem>
+
+                        <TabItem Header="历史与诊断">
+                            <Grid>
+                                <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="*" /></Grid.RowDefinitions>
+                                <DockPanel Margin="0,0,0,14">
+                                    <StackPanel DockPanel.Dock="Left"><TextBlock Text="历史与诊断" FontSize="18" FontWeight="Bold" /><TextBlock Text="本地保留最近 120 个采样点，不上传数据" Foreground="{StaticResource MutedTextBrush}" FontSize="11" Margin="0,3,0,0" /></StackPanel>
+                                    <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                                        <Button Content="复制诊断报告" Command="{Binding CopyDiagnosticReportCommand}" Margin="0,0,8,0" />
+                                        <Button Style="{StaticResource PrimaryButton}" Content="导出 CSV" Command="{Binding ExportHistoryCommand}" />
+                                    </StackPanel>
+                                </DockPanel>
+                                <Border Grid.Row="1" Style="{StaticResource CardBorder}" Padding="8">
+                                    <DataGrid ItemsSource="{Binding History}" AutoGenerateColumns="False" CanUserAddRows="False" IsReadOnly="True" EnableRowVirtualization="True">
+                                        <DataGrid.Columns>
+                                            <DataGridTextColumn Header="时间" Binding="{Binding TimeText}" Width="*" />
+                                            <DataGridTextColumn Header="CPU 使用率" Binding="{Binding CpuText}" Width="*" />
+                                            <DataGridTextColumn Header="内存使用率" Binding="{Binding MemoryText}" Width="*" />
+                                        </DataGrid.Columns>
+                                    </DataGrid>
+                                </Border>
+                            </Grid>
+                        </TabItem>
+
+                        <TabItem Header="设置">
+                            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                <StackPanel MaxWidth="760">
+                                    <TextBlock Text="设置" FontSize="18" FontWeight="Bold" />
+                                    <TextBlock Text="保持本地、低打扰的监控体验" Foreground="{StaticResource MutedTextBrush}" FontSize="11" Margin="0,3,0,18" />
+                                    <Border Style="{StaticResource CardBorder}" Margin="0,0,0,14">
+                                        <StackPanel>
+                                            <TextBlock Text="窗口行为" FontSize="14" FontWeight="SemiBold" />
+                                            <CheckBox Content="最小化到系统托盘" IsChecked="{Binding MinimizeToTray, Mode=TwoWay}" />
+                                            <TextBlock Text="关闭窗口前可选择保留后台监控；托盘图标可重新打开工作台。" Foreground="{StaticResource MutedTextBrush}" FontSize="11" Margin="24,0,0,0" TextWrapping="Wrap" />
+                                        </StackPanel>
+                                    </Border>
+                                    <Border Style="{StaticResource CardBorder}" Margin="0,0,0,14">
+                                        <StackPanel>
+                                            <TextBlock Text="启动策略" FontSize="14" FontWeight="SemiBold" />
+                                            <CheckBox Content="随 Windows 启动（当前版本预留，默认关闭）" IsChecked="{Binding StartWithWindows, Mode=TwoWay}" />
+                                            <TextBlock Text="应用不会写入系统自启动项，首次启动与后续启动均由用户主动打开。" Foreground="{StaticResource MutedTextBrush}" FontSize="11" Margin="24,0,0,0" TextWrapping="Wrap" />
+                                        </StackPanel>
+                                    </Border>
+                                    <Border Style="{StaticResource CardBorder}">
+                                        <StackPanel>
+                                            <TextBlock Text="采样与隐私" FontSize="14" FontWeight="SemiBold" />
+                                            <TextBlock Text="采样间隔" Foreground="{StaticResource MutedTextBrush}" FontSize="11" Margin="0,13,0,2" />
+                                            <TextBlock Text="2 秒（后台 PeriodicTimer + Channel）" FontSize="13" />
+                                            <TextBlock Text="数据范围" Foreground="{StaticResource MutedTextBrush}" FontSize="11" Margin="0,13,0,2" />
+                                            <TextBlock Text="仅本机进程、CPU、内存与本地适配能力；不会执行进程控制，也不会上传。" FontSize="13" TextWrapping="Wrap" />
+                                        </StackPanel>
+                                    </Border>
+                                </StackPanel>
+                            </ScrollViewer>
+                        </TabItem>
+                    </TabControl>
+                </Grid>
+            </Grid>
+        </Grid>
+    </Border>
+</Window>
