@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.ComponentModel;
 
 namespace Codex.ProcessMonitor.App.Models;
 
@@ -19,7 +20,8 @@ public sealed record ProcessSample(
     double CpuPercent,
     long MemoryBytes,
     string Status,
-    bool IsElevated = false);
+    bool IsElevated = false,
+    string? InstanceKey = null);
 
 public sealed record AlertSample(
     DateTimeOffset Timestamp,
@@ -38,12 +40,15 @@ public sealed record CapabilitySample(
     string Source);
 
 /// <summary>Observable item used by the process tree.</summary>
-public sealed class ProcessNode
+public sealed class ProcessNode : INotifyPropertyChanged
 {
     public ProcessNode(ProcessSample sample)
     {
         ProcessId = sample.ProcessId;
         ParentProcessId = sample.ParentProcessId;
+        InstanceKey = string.IsNullOrWhiteSpace(sample.InstanceKey)
+            ? $"{sample.ProcessId}:{sample.Name}"
+            : sample.InstanceKey;
         Name = sample.Name;
         CpuPercent = sample.CpuPercent;
         MemoryBytes = sample.MemoryBytes;
@@ -51,13 +56,38 @@ public sealed class ProcessNode
         Children = new ObservableCollection<ProcessNode>();
     }
 
+    public event PropertyChangedEventHandler? PropertyChanged;
+
     public int ProcessId { get; }
     public int ParentProcessId { get; }
+    public string InstanceKey { get; }
     public string Name { get; }
     public double CpuPercent { get; }
     public long MemoryBytes { get; }
     public string Status { get; }
     public ObservableCollection<ProcessNode> Children { get; }
+
+    /// <summary>
+    /// WPF binds TreeViewItem.IsExpanded to this value. Keeping it on the
+    /// stable process node lets the view restore expansion after a 2-second
+    /// snapshot rebuild instead of collapsing every time the sample changes.
+    /// </summary>
+    public bool IsExpanded
+    {
+        get => _isExpanded;
+        set
+        {
+            if (_isExpanded == value)
+            {
+                return;
+            }
+
+            _isExpanded = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsExpanded)));
+        }
+    }
+
+    private bool _isExpanded;
 
     public string CpuText => $"{CpuPercent:0.0}%";
     public string MemoryText => FormatBytes(MemoryBytes);

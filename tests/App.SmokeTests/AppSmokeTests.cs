@@ -43,4 +43,31 @@ public sealed class AppSmokeTests
             process.Name.Equals("services.exe", StringComparison.OrdinalIgnoreCase) ||
             process.Name.Equals("lsass.exe", StringComparison.OrdinalIgnoreCase));
     }
+
+    [Fact]
+    public void ProcessNodeKeepsExpansionStateAcrossStableRefreshIdentity()
+    {
+        var first = new ProcessNode(new ProcessSample(
+            42,
+            7,
+            "ChatGPT.exe",
+            1,
+            1024,
+            "运行中",
+            InstanceKey: "42:638000000000000000"));
+        first.IsExpanded = true;
+
+        var refreshed = new ProcessNode(new ProcessSample(
+            42,
+            7,
+            "ChatGPT.exe",
+            2,
+            2048,
+            "运行中",
+            InstanceKey: "42:638000000000000000"));
+        refreshed.IsExpanded = first.IsExpanded;
+
+        Assert.Equal(first.InstanceKey, refreshed.InstanceKey);
+        Assert.True(refreshed.IsExpanded);
+    }
 }

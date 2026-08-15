@@ -19,6 +19,7 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IAsyncDisposab
     private readonly Dispatcher _dispatcher;
     private readonly CancellationTokenSource _lifetime = new();
     private readonly HashSet<string> _alertKeys = new(StringComparer.Ordinal);
+    private readonly HashSet<string> _expandedProcessKeys = new(StringComparer.Ordinal);
     private Task? _consumerTask;
     private int _selectedPageIndex;
     private double _cpuPercent;
@@ -318,17 +319,59 @@ public sealed class MainWindowViewModel : INotifyPropertyChanged, IAsyncDisposab
 
     private void RebuildProcessTree(IReadOnlyList<ProcessSample> samples)
     {
-        var nodes = samples.ToDictionary(static sample => sample.ProcessId, static sample => new ProcessNode(sample));
+        // TreeView recreates its containers whenever the bound collection is
+        // replaced. Capture expansion by the sampler's PID+start-time key so
+        // a normal refresh does not collapse an item the user just opened, and
+        // a reused PID cannot inherit the old process's expansion state.
+        foreach (var node in Flatten(ProcessTree))
+        {
+            if (node.IsExpanded)
+            {
+                _expandedProcessKeys.Add(node.InstanceKey);
+            }
+        }
+
+        var nodes = samples
+            .Select(sample => new ProcessNode(sample))
+            .ToDictionary(static node => node.InstanceKey, StringComparer.Ordinal);
+        var nodesByPid = nodes.Values
+            .GroupBy(static node => node.ProcessId)
+            .ToDictionary(static group => group.Key, static group => group.ToArray());
+
+        foreach (var node in nodes.Values)
+        {
+            node.IsExpanded = _expandedProcessKeys.Contains(node.InstanceKey);
+        }
+
         ProcessTree.Clear();
         foreach (var node in nodes.Values.OrderByDescending(static node => node.CpuPercent))
         {
-            if (node.ParentProcessId != 0 && nodes.TryGetValue(node.ParentProcessId, out var parent))
+            // ParentProcessId alone is not an identity (PIDs can be reused),
+            // so only attach when exactly one current process has that PID.
+            if (node.ParentProcessId != 0
+                && nodesByPid.TryGetValue(node.ParentProcessId, out var parents)
+                && parents.Length == 1)
             {
-                parent.Children.Add(node);
+                parents[0].Children.Add(node);
             }
             else
             {
                 ProcessTree.Add(node);
+            }
+        }
+
+        var currentKeys = nodes.Keys.ToHashSet(StringComparer.Ordinal);
+        _expandedProcessKeys.RemoveWhere(key => !currentKeys.Contains(key));
+    }
+
+    private static IEnumerable<ProcessNode> Flatten(IEnumerable<ProcessNode> roots)
+    {
+        foreach (var root in roots)
+        {
+            yield return root;
+            foreach (var child in Flatten(root.Children))
+            {
+                yield return child;
             }
         }
     }

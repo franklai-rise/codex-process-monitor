@@ -391,7 +391,8 @@ public sealed class WindowsRuntimeMonitorSource : IMonitorSource, IHistoryBatchS
                 Path.GetFileName(process.ImageName) is { Length: > 0 } imageName ? imageName : process.ImageName,
                 cpuPercent,
                 Math.Max(0, process.WorkingSetBytes),
-                BuildStatus(process, ioRate)));
+                BuildStatus(process, ioRate),
+                InstanceKey: stableKey));
         }
 
         foreach (var staleKey in _previousProcesses.Keys.Where(key => !currentKeys.Contains(key)).ToArray())

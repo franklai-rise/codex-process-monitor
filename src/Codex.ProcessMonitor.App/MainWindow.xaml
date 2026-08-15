@@ -166,6 +166,9 @@
                                             <DockPanel Margin="0,0,0,8"><TextBlock Text="进程树" FontSize="13" FontWeight="SemiBold" /><TextBlock DockPanel.Dock="Right" Text="只读" Foreground="{StaticResource AccentAltBrush}" FontSize="10" /></DockPanel>
                                             <TreeView Grid.Row="1" ItemsSource="{Binding ProcessTree}" Background="Transparent" BorderThickness="0" Foreground="{StaticResource TextBrush}">
                                                 <TreeView.Resources>
+                                                    <Style TargetType="{x:Type TreeViewItem}">
+                                                        <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}" />
+                                                    </Style>
                                                     <HierarchicalDataTemplate DataType="{x:Type models:ProcessNode}" ItemsSource="{Binding Children}">
                                                         <Grid MinWidth="550">
                                                             <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="70" /><ColumnDefinition Width="90" /><ColumnDefinition Width="92" /></Grid.ColumnDefinitions>
@@ -215,6 +218,9 @@
                                     <Border Grid.Column="0" Style="{StaticResource CardBorder}" Padding="8" Margin="0,0,7,0">
                                         <TreeView ItemsSource="{Binding ProcessTree}" Background="Transparent" BorderThickness="0" Foreground="{StaticResource TextBrush}">
                                             <TreeView.Resources>
+                                                <Style TargetType="{x:Type TreeViewItem}">
+                                                    <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}" />
+                                                </Style>
                                                 <HierarchicalDataTemplate DataType="{x:Type models:ProcessNode}" ItemsSource="{Binding Children}">
                                                     <Grid MinWidth="620" Margin="2,3">
                                                         <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="90" /><ColumnDefinition Width="100" /><ColumnDefinition Width="110" /><ColumnDefinition Width="100" /></Grid.ColumnDefinitions>
