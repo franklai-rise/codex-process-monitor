@@ -13,7 +13,7 @@
     <Platforms>AnyCPU</Platforms>
     <PlatformTarget>AnyCPU</PlatformTarget>
     <Prefer32Bit>false</Prefer32Bit>
-    <ApplicationIcon />
+    <ApplicationIcon>../../assets/codex-process-monitor-logo.ico</ApplicationIcon>
     <IncludeSharedProjects Condition="'$(IncludeSharedProjects)' == ''">true</IncludeSharedProjects>
   </PropertyGroup>
 
