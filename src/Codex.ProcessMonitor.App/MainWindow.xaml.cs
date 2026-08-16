@@ -1,9 +1,11 @@
 using System.ComponentModel;
 using System.Drawing;
+using System.IO;
 using System.Windows;
 using System.Windows.Input;
 using Codex.ProcessMonitor.App.Services;
 using Codex.ProcessMonitor.App.ViewModels;
+using DrawingIcon = System.Drawing.Icon;
 using Forms = System.Windows.Forms;
 
 namespace Codex.ProcessMonitor.App;
@@ -11,6 +13,7 @@ namespace Codex.ProcessMonitor.App;
 public partial class MainWindow : Window
 {
     private readonly MainWindowViewModel _viewModel;
+    private readonly DrawingIcon _trayIcon;
     private readonly Forms.NotifyIcon _notifyIcon;
     private bool _allowClose;
 
@@ -31,9 +34,10 @@ public partial class MainWindow : Window
         menu.Items.Add(new Forms.ToolStripSeparator());
         menu.Items.Add(exitItem);
 
+        _trayIcon = LoadTrayIcon();
         _notifyIcon = new Forms.NotifyIcon
         {
-            Icon = SystemIcons.Application,
+            Icon = _trayIcon,
             Text = "Codex 进程监视器（只读）",
             Visible = true,
             ContextMenuStrip = menu
@@ -55,7 +59,31 @@ public partial class MainWindow : Window
 
         _notifyIcon.Visible = false;
         _notifyIcon.Dispose();
+        _trayIcon.Dispose();
         await _viewModel.DisposeAsync();
+    }
+
+    private static DrawingIcon LoadTrayIcon()
+    {
+        try
+        {
+            var executablePath = Environment.ProcessPath
+                ?? System.Windows.Application.ResourceAssembly.Location;
+            if (!string.IsNullOrWhiteSpace(executablePath) && File.Exists(executablePath))
+            {
+                var icon = DrawingIcon.ExtractAssociatedIcon(executablePath);
+                if (icon is not null)
+                {
+                    return icon;
+                }
+            }
+        }
+        catch (Exception)
+        {
+            // The monitor remains usable even if Windows cannot read the executable icon.
+        }
+
+        return (DrawingIcon)SystemIcons.Application.Clone();
     }
 
     private void OnStateChanged(object? sender, EventArgs e)
